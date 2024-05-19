@@ -4,88 +4,77 @@ import random
 import time
 import csv
 
-class Customer:
-    def __init__(self, id, service_time):
-        self.id = id
-        self.service_time = service_time
-    
-    def __lt__(self, other):
-        return self.service_time < other.service_time
+NUM_TELLERS = 3
+MAX_SERVICE_TIME = 10
+NUM_CUSTOMERS = 15
+QUANTUM_TIME = 3
 
 class Teller(threading.Thread):
-    def __init__(self, id, queue, gantt_data, quantum_time):
-        threading.Thread.__init__(self)
-        self.id = id
-        self.queue = queue
-        self.gantt_data = gantt_data
-        self.quantum_time = quantum_time
-        self.daemon = True
+    def __init__(self, teller_id, customer_queue, print_lock, writer_lock, writer):
+        super().__init__()
+        self.teller_id = teller_id
+        self.customer_queue = customer_queue
+        self.print_lock = print_lock
+        self.writer_lock = writer_lock
+        self.writer = writer
 
     def run(self):
         while True:
-            customer = self.queue.get()
-            entry_time = time.time()  # Record entry time
-            print(f"Customer {customer.id} enters Teller{self.id}")
-            self.gantt_data.append((customer.id, self.id, entry_time, 'arrival'))
+            try:
+                customer_id, service_time, entering_time = self.customer_queue.get(timeout=1)
+            except queue.Empty:
+                continue
 
-            # Serve the customer in chunks (quantum time)
-            while customer.service_time > 0:
-                # Check if remaining service time is less than the quantum time
-                if customer.service_time <= self.quantum_time:
-                    time.sleep(customer.service_time)
-                    customer.service_time = 0
+            with self.print_lock:
+                print(f"Customer {customer_id} is in Teller{self.teller_id}")
+
+            while service_time > 0:
+                if service_time > QUANTUM_TIME:
+                    time.sleep(QUANTUM_TIME)
+                    service_time -= QUANTUM_TIME
                 else:
-                    time.sleep(self.quantum_time)
-                    customer.service_time -= self.quantum_time
+                    time.sleep(service_time)
+                    service_time = 0
 
-            exit_time = time.time()  # Record exit time
-            print(f"Customer {customer.id} leaves Teller{self.id}")
-            self.gantt_data.append((customer.id, self.id, exit_time, 'departure'))
-            self.queue.task_done()
+                with self.writer_lock:
+                    self.writer.writerow([customer_id, entering_time, time.time()])
+                
+                with self.print_lock:
+                    print(f"Customer {customer_id} is being served by Teller{self.teller_id}. Remaining service time: {service_time}")
 
-def generate_customers(num_customers, queue, barrier):
-    barrier.wait()  # Wait for all customers to be ready
-    arrival_time = time.time()  # Record arrival time for all customers
-    for i in range(num_customers):
-        service_time = random.uniform(1, 5)  # Random service time
-        customer = Customer((i + 1), service_time)  # Unique customer IDs
-        print(f"Customer {customer.id} enters the Queue with service time {service_time}")
-        queue.put(customer)
+                if service_time > 0:
+                    next_customer = self.customer_queue.get()
+                    self.customer_queue.put((customer_id, service_time, entering_time))
+                    customer_id, service_time, entering_time = next_customer
+                    with self.print_lock:
+                        print(f"Customer {customer_id} is in Teller{self.teller_id}")
 
-def main():
-    num_tellers = 3
-    num_customers = 10
-
-    # User input for quantum time
-    quantum_time = float(input("Enter the quantum time for Round Robin algorithm (in seconds): "))
-
-    q = queue.Queue()  # Using a regular queue for simplicity
-    gantt_data = []  # List to store Gantt chart data
-
-    # Create tellers
-    tellers = [Teller(i+1, q, gantt_data, quantum_time) for i in range(num_tellers)]
-
-    # Start teller threads
-    for teller in tellers:
-        teller.start()
-
-    # Create a barrier for synchronizing customer threads
-    barrier = threading.Barrier(num_customers)
-
-    # Generate customers
-    customers = [threading.Thread(target=generate_customers, args=(num_customers, q, barrier)) for _ in range(num_customers)]
-    for customer in customers:
-        customer.start()
-
-    # Wait for all customers to be served
-    q.join()
-
-    # Write Gantt chart data to CSV file
-    with open("./RoundRobin/rrData.csv", "w", newline="") as file:
-        writer = csv.writer(file)
-        writer.writerow(["Customer", "Teller", "Time", "Event"])
-        for item in gantt_data:
-            writer.writerow(item)
+            with self.writer_lock:
+                self.writer.writerow([customer_id, entering_time, time.time()])
+                print(f"Customer {customer_id} leaves Teller{self.teller_id}")
 
 if __name__ == "__main__":
-    main()
+    customer_queue = queue.Queue()
+
+    print_lock = threading.Lock()
+    writer_lock = threading.Lock()
+    
+    # Open CSV file for writing
+    with open("./RoundRobin/rrData.csv", mode="w", newline="") as file:
+        writer = csv.writer(file)
+        writer.writerow(["Customer ID", "Entering Time", "Exiting Time"])
+        
+        # Start teller threads
+        tellers = []
+        for i in range(NUM_TELLERS):
+            teller = Teller(i+1, customer_queue, print_lock, writer_lock, writer)
+            teller.start()
+            tellers.append(teller)
+
+        # Generate customers and put them in the queue with random arrival times
+        for customer_id in range(1, NUM_CUSTOMERS+1):
+            service_time = random.randint(1, MAX_SERVICE_TIME)
+            entering_time = time.time()
+            customer_queue.put((customer_id, service_time, entering_time))
+            print(f"Customer {customer_id} enters the Queue")
+            time.sleep(random.uniform(0.1, 1))  # Random delay between customer arrivals
