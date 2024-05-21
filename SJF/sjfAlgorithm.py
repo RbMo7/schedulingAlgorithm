@@ -102,35 +102,38 @@ def calculate_averages(completed_customers):
 
 def main():
     num_tellers = 3
-    num_customers = 10
+    num_customers = 50
     q = queue.PriorityQueue()
     lock = threading.Lock()
     completed_customers = []
     stop_event = threading.Event()
 
-    # Create tellers
-    tellers = [Teller(i + 1, q, lock, completed_customers, stop_event) for i in range(num_tellers)]
+    try:
+        # Create tellers
+        tellers = [Teller(i + 1, q, lock, completed_customers, stop_event) for i in range(num_tellers)]
 
-    # Start teller threads
-    for teller in tellers:
-        teller.start()
+        # Start teller threads
+        for teller in tellers:
+            teller.start()
 
-    # Generate customers
-    generate_customers(num_customers, q, tellers, lock)
+        # Generate customers
+        generate_customers(num_customers, q, tellers, lock)
+    except KeyboardInterrupt:
+        print("Simulation stopped")
+        # Wait for all customers to be served
+        while not q.empty() or any(teller.current_customer is not None for teller in tellers):
+            time.sleep(1)
+        stop_event.set()
 
-    # Wait for all customers to be served
-    while not q.empty() or any(teller.current_customer is not None for teller in tellers):
-        time.sleep(1)
+        # Signal tellers to stop
+    finally:
 
-    # Signal tellers to stop
-    stop_event.set()
+        # Ensure all tellers finish
+        for teller in tellers:
+            teller.join()
 
-    # Ensure all tellers finish
-    for teller in tellers:
-        teller.join()
-
-    # Calculate and print averages
-    calculate_averages(completed_customers)
+        # Calculate and print averages
+        calculate_averages(completed_customers)
     
 
 def generate_graph(avg_turnaround_time, avg_waiting_time, avg_response_time):

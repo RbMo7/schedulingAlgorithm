@@ -33,7 +33,7 @@ class Teller(threading.Thread):
                 customer.teller_id = self.teller_id  
             print(f"Customer {customer.customer_id} is in Teller{self.teller_id}")
             service_time = random.randint(1, 5)
-            time.sleep(service_time)  # Simulate service time
+            time.sleep(service_time)  
             with self.data_lock:
                 customer.end_time = time.time()
                 self.timing_data.append(customer)
@@ -50,7 +50,7 @@ def main():
 
     customer_id = 1
     try:
-        while customer_id <= 15:  # Limit number of customers for demonstration
+        while customer_id <= 50:  # Limit number of customers for demonstration
             if not customer_queue.full():
                 arrival_time = time.time()
                 customer = Customer(customer_id, arrival_time)
