@@ -72,30 +72,19 @@ def main():
             teller.join()
 
         # Write the data to a CSV file
-        avg_turnaround_time, avg_waiting_time, avg_response_time = write_to_csv(timing_data)
-
-        # Generate the graph
-        generate_graph(avg_turnaround_time, avg_waiting_time, avg_response_time)
+        write_to_csv(timing_data)
 
 def write_to_csv(timing_data):
     total_turnaround_time = 0
     total_waiting_time = 0
     total_response_time = 0
-    num_customers = len(timing_data)
 
-    with open('./FCFS/fcfsData.csv', mode='w', newline='') as file:
-        writer = csv.writer(file)
-        writer.writerow(['Customer ID', 'Arrival Time', 'Start Time', 'End Time', 'Teller ID', 'Turnaround Time', 'Waiting Time', 'Response Time'])  # Include 'Teller ID' in the header
-        for customer in timing_data:
-            turnaround_time = customer.end_time - customer.arrival_time
-            waiting_time = customer.start_time - customer.arrival_time
-            response_time = customer.start_time - customer.arrival_time
-            
-            total_turnaround_time += turnaround_time
-            total_waiting_time += waiting_time
-            total_response_time += response_time
-            
-            writer.writerow([customer.customer_id, customer.arrival_time, customer.start_time, customer.end_time, customer.teller_id, turnaround_time, waiting_time, response_time])  # Write teller ID along with other data
+    for customer in timing_data:
+        total_turnaround_time += customer.end_time - customer.arrival_time
+        total_waiting_time += customer.start_time - customer.arrival_time
+        total_response_time += customer.start_time - customer.arrival_time  # This is the time when they enter the queue
+
+    num_customers = len(timing_data)
 
     avg_turnaround_time = total_turnaround_time / num_customers
     avg_waiting_time = total_waiting_time / num_customers
@@ -105,7 +94,10 @@ def write_to_csv(timing_data):
     print(f"Average Waiting Time: {avg_waiting_time:.2f} seconds")
     print(f"Average Response Time: {avg_response_time:.2f} seconds")
 
-    return avg_turnaround_time, avg_waiting_time, avg_response_time
+    generate_graph(avg_turnaround_time, avg_waiting_time, avg_response_time)
+
+
+    generate_graph(avg_turnaround_time, avg_waiting_time, avg_response_time)
 
 def generate_graph(avg_turnaround_time, avg_waiting_time, avg_response_time):
     labels = ['Turnaround Time', 'Waiting Time', 'Response Time']
