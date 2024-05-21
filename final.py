@@ -3,7 +3,6 @@ import time
 import random
 import queue
 from collections import deque
-import matplotlib.pyplot as plt
 
 # Constants
 NUM_TELLERS = 3
@@ -48,6 +47,50 @@ def customer_arrival(customer_id):
         customer_queue.put((service_time, customer_id), timeout=1)
     except queue.Full:
         print("Queue is FULL.")
+
+# FCFS Teller Service Function
+def teller_service_fcfs(teller_id):
+    while not stop_event.is_set():
+        try:
+            service_time, customer_id = customer_queue.get(timeout=1)
+            start_time = time.time()
+            print(f"Customer {customer_id} is in Teller {teller_id} at {timeConverter(start_time)}")
+            time.sleep(service_time)
+            end_time = time.time()
+            with lock:
+                completion_times[customer_id] = end_time
+                turnaround_time = end_time - arrival_times[customer_id]
+                turnaround_times.append(turnaround_time)
+                waiting_time = start_time - arrival_times[customer_id]
+                waiting_times.append(waiting_time)
+            print(f"Customer {customer_id} leaves the Teller {teller_id} at {timeConverter(end_time)}")
+        except queue.Empty:
+            continue
+
+# SJF Teller Service Function
+def teller_service_sjf(teller_id):
+    while not stop_event.is_set():
+        try:
+            with lock:
+                sorted_customers = sorted(list(customer_queue.queue), key=lambda x: x[0])
+                customer_queue.queue.clear()
+                for customer in sorted_customers:
+                    customer_queue.put_nowait(customer)
+
+            service_time, customer_id = customer_queue.get(timeout=1)
+            start_time = time.time()
+            print(f"Customer {customer_id} is in Teller {teller_id} at {timeConverter(start_time)}")
+            time.sleep(service_time)
+            end_time = time.time()
+            with lock:
+                completion_times[customer_id] = end_time
+                turnaround_time = end_time - arrival_times[customer_id]
+                turnaround_times.append(turnaround_time)
+                waiting_time = start_time - arrival_times[customer_id]
+                waiting_times.append(waiting_time)
+            print(f"Customer {customer_id} leaves the Teller {teller_id} at {timeConverter(end_time)}")
+        except queue.Empty:
+            continue
 
 # Round Robin Teller Service Function
 def teller_service_rr(teller_id):
@@ -107,23 +150,15 @@ def calculate_stats(description):
     with lock:
         avg_turnaround_time = sum(turnaround_times) / len(turnaround_times)
         avg_waiting_time = sum(waiting_times) / len(waiting_times)
-        avg_response_time = avg_turnaround_time + avg_waiting_time
     print(f"\nStatistics for {description}:")
     print(f"Average Turnaround Time: {avg_turnaround_time:.4f} seconds")
     print(f"Average Waiting Time: {avg_waiting_time:.4f} seconds")
-    generate_graph(avg_turnaround_time, avg_response_time, avg_waiting_time)
-
-def generate_graph(avg_turnaround_time, avg_waiting_time, avg_response_time):
-    labels = ['Turnaround Time', 'Waiting Time', 'Response Time']
-    values = [avg_turnaround_time, avg_waiting_time, avg_response_time]
-
-    plt.figure(figsize=(8, 6))
-    plt.bar(labels, values, color=['blue', 'orange', 'green'])
-    plt.xlabel('Metrics')
-    plt.ylabel('Time (seconds)')
-    plt.title('Average Turnaround Time, Waiting Time, and Response Time')
-    plt.show()
 
 # Run the Simulations
 if __name__ == "__main__":
+    print("Starting FCFS Simulation...")
+    main(teller_service_fcfs, "FCFS")
+    print("\nStarting SJF Simulation...")
+    main(teller_service_sjf, "SJF")
+    print("\nStarting Round Robin Simulation...")
     main(teller_service_rr, "Round Robin")

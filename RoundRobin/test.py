@@ -3,7 +3,6 @@ import time
 import random
 import queue
 from collections import deque
-import matplotlib.pyplot as plt
 
 # Constants
 NUM_TELLERS = 3
@@ -107,22 +106,9 @@ def calculate_stats(description):
     with lock:
         avg_turnaround_time = sum(turnaround_times) / len(turnaround_times)
         avg_waiting_time = sum(waiting_times) / len(waiting_times)
-        avg_response_time = avg_turnaround_time + avg_waiting_time
     print(f"\nStatistics for {description}:")
     print(f"Average Turnaround Time: {avg_turnaround_time:.4f} seconds")
     print(f"Average Waiting Time: {avg_waiting_time:.4f} seconds")
-    generate_graph(avg_turnaround_time, avg_response_time, avg_waiting_time)
-
-def generate_graph(avg_turnaround_time, avg_waiting_time, avg_response_time):
-    labels = ['Turnaround Time', 'Waiting Time', 'Response Time']
-    values = [avg_turnaround_time, avg_waiting_time, avg_response_time]
-
-    plt.figure(figsize=(8, 6))
-    plt.bar(labels, values, color=['blue', 'orange', 'green'])
-    plt.xlabel('Metrics')
-    plt.ylabel('Time (seconds)')
-    plt.title('Average Turnaround Time, Waiting Time, and Response Time')
-    plt.show()
 
 # Run the Simulations
 if __name__ == "__main__":

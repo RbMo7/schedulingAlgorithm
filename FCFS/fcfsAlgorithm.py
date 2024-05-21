@@ -11,7 +11,7 @@ class Customer:
         self.arrival_time = arrival_time
         self.start_time = None
         self.end_time = None
-        self.teller_id = None  # New attribute to store the teller ID
+        self.teller_id = None  
 
 class Teller(threading.Thread):
     def __init__(self, teller_id, customer_queue, data_lock, timing_data):
@@ -30,7 +30,7 @@ class Teller(threading.Thread):
                 break
             with self.data_lock:
                 customer.start_time = time.time()
-                customer.teller_id = self.teller_id  # Assign teller ID to the customer
+                customer.teller_id = self.teller_id  
             print(f"Customer {customer.customer_id} is in Teller{self.teller_id}")
             service_time = random.randint(1, 5)
             time.sleep(service_time)  # Simulate service time

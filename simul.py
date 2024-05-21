@@ -3,7 +3,6 @@ import time
 import random
 import queue
 from collections import deque
-import matplotlib.pyplot as plt
 
 # Constants
 NUM_TELLERS = 3
@@ -24,37 +23,73 @@ waiting_times = []
 # Lock for thread-safe updates to statistics
 lock = threading.Lock()
 
-# Flag to stop threads
-stop_event = threading.Event()
-
-def timeConverter(t1):
-    local_time = time.localtime(t1)
-    formatted_time = time.strftime("%Y-%m-%d %H:%M:%S", local_time)
-    return formatted_time
-
-def empty_queue(q):
-    while not q.empty():
-        q.get()
-
 # Common Customer Arrival Function
 def customer_arrival(customer_id):
-    service_time = random.randint(3, MAX_SERVICE_TIME)
+    service_time = random.randint(4, MAX_SERVICE_TIME)
     arrival_time = time.time()
+    local_time = time.localtime(arrival_time)
+
+# Format the struct_time object into a human-readable string
+    formatted_time = time.strftime("%Y-%m-%d %H:%M:%S", local_time)
     with lock:
         arrival_times[customer_id] = arrival_time
         service_times[customer_id] = service_time
-    print(f"Customer{customer_id} enters the Queue with service time {service_time} at {timeConverter(arrival_time)}")
+    print(f"Customer{customer_id} enters the Queue with service time {service_time} at {formatted_time}")
     try:
         customer_queue.put((service_time, customer_id), timeout=1)
     except queue.Full:
         print("Queue is FULL.")
 
-# Round Robin Teller Service Function
-def teller_service_rr(teller_id):
-    while not stop_event.is_set():
+# FCFS Teller Service Function
+def teller_service_fcfs(teller_id):
+    while True:
         try:
             service_time, customer_id = customer_queue.get(timeout=1)
-            print(f"Customer {customer_id} is in Teller {teller_id} for a quantum of {QUANTUM_TIME}")
+            start_time = time.time()
+            print(f"Customer {customer_id} is in Teller {teller_id}")
+            time.sleep(service_time)
+            end_time = time.time()
+            with lock:
+                completion_times[customer_id] = end_time
+                turnaround_time = end_time - arrival_times[customer_id]
+                turnaround_times.append(turnaround_time)
+                waiting_time = start_time - arrival_times[customer_id]
+                waiting_times.append(waiting_time)
+            print(f"Customer {customer_id} leaves the Teller {teller_id}")
+        except queue.Empty:
+            continue
+
+# SJF Teller Service Function
+def teller_service_sjf(teller_id):
+    while True:
+        try:
+            with lock:
+                sorted_customers = sorted(list(customer_queue.queue), key=lambda x: x[0])
+                customer_queue.queue.clear()
+                for customer in sorted_customers:
+                    customer_queue.put_nowait(customer)
+
+            service_time, customer_id = customer_queue.get(timeout=1)
+            start_time = time.time()
+            print(f"Customer {customer_id} is in Teller{teller_id}")
+            time.sleep(service_time)
+            end_time = time.time()
+            with lock:
+                completion_times[customer_id] = end_time
+                turnaround_time = end_time - arrival_times[customer_id]
+                turnaround_times.append(turnaround_time)
+                waiting_time = start_time - arrival_times[customer_id]
+                waiting_times.append(waiting_time)
+            print(f"Customer {customer_id} leaves the Teller{teller_id}")
+        except queue.Empty:
+            continue
+
+# Round Robin Teller Service Function
+def teller_service_rr(teller_id):
+    while True:
+        try:
+            service_time, customer_id = customer_queue.get(timeout=1)
+            print(f"Customer {customer_id} is in Teller{teller_id} for a quantum of {QUANTUM_TIME}")
             start_time = time.time()
             if service_time <= QUANTUM_TIME:
                 time.sleep(service_time)
@@ -84,7 +119,6 @@ def start_tellers(service_function):
 
 # Main Loop to Simulate Customer Arrivals
 def main(service_function, description):
-    empty_queue(customer_queue)
     customer_id = 1
     try:
         tellers = start_tellers(service_function)
@@ -95,35 +129,28 @@ def main(service_function, description):
             time.sleep(random.uniform(0.5, 2))  # Random arrival time
     except KeyboardInterrupt:
         print("Simulation stopped.")
-        stop_event.set()
     finally:
-        for t in tellers:
-            t.join()
+        time.sleep(20)  # Allow all threads to complete
         calculate_stats(description)
-        stop_event.clear()
 
 # Calculate and Print Statistics
 def calculate_stats(description):
     with lock:
         avg_turnaround_time = sum(turnaround_times) / len(turnaround_times)
         avg_waiting_time = sum(waiting_times) / len(waiting_times)
-        avg_response_time = avg_turnaround_time + avg_waiting_time
     print(f"\nStatistics for {description}:")
     print(f"Average Turnaround Time: {avg_turnaround_time:.4f} seconds")
     print(f"Average Waiting Time: {avg_waiting_time:.4f} seconds")
-    generate_graph(avg_turnaround_time, avg_response_time, avg_waiting_time)
-
-def generate_graph(avg_turnaround_time, avg_waiting_time, avg_response_time):
-    labels = ['Turnaround Time', 'Waiting Time', 'Response Time']
-    values = [avg_turnaround_time, avg_waiting_time, avg_response_time]
-
-    plt.figure(figsize=(8, 6))
-    plt.bar(labels, values, color=['blue', 'orange', 'green'])
-    plt.xlabel('Metrics')
-    plt.ylabel('Time (seconds)')
-    plt.title('Average Turnaround Time, Waiting Time, and Response Time')
-    plt.show()
+    print(f"Waiting time list: {waiting_times}")
+    
 
 # Run the Simulations
 if __name__ == "__main__":
+    print("Starting FCFS Simulation...")
+    main(teller_service_fcfs, "FCFS")
+    print("\nStarting SJF Simulation...")
+    main(teller_service_sjf, "SJF")
+    print("\nStarting Round Robin Simulation...")
     main(teller_service_rr, "Round Robin")
+
+
