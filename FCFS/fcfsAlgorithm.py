@@ -14,12 +14,13 @@ class Customer:
         self.teller_id = None  
 
 class Teller(threading.Thread):
-    def __init__(self, teller_id, customer_queue, data_lock, timing_data):
+    def __init__(self, teller_id, customer_queue, data_lock, timing_data, customer_count):
         threading.Thread.__init__(self)
         self.teller_id = teller_id
         self.customer_queue = customer_queue
         self.data_lock = data_lock
         self.timing_data = timing_data
+        self.customer_count = customer_count
         self.daemon = True
         self.start()
 
@@ -31,13 +32,14 @@ class Teller(threading.Thread):
             with self.data_lock:
                 customer.start_time = time.time()
                 customer.teller_id = self.teller_id  
-            print(f"Customer {customer.customer_id} is in Teller{self.teller_id}")
+                self.customer_count[self.teller_id] += 1  # Increment the counter for this teller
+            print(f"Customer {customer.customer_id} is in Teller {self.teller_id}")
             service_time = random.randint(1, 5)
             time.sleep(service_time)  
             with self.data_lock:
                 customer.end_time = time.time()
                 self.timing_data.append(customer)
-            print(f"Customer {customer.customer_id} leaves Teller{self.teller_id}")
+            print(f"Customer {customer.customer_id} leaves Teller {self.teller_id}")
             self.customer_queue.task_done()
 
 def main():
@@ -45,8 +47,9 @@ def main():
     customer_queue = queue.Queue(maxsize=10)
     data_lock = threading.Lock()
     timing_data = []
+    customer_count = {i: 0 for i in range(1, num_tellers + 1)}  # Dictionary to count customers attended by each teller
 
-    tellers = [Teller(i, customer_queue, data_lock, timing_data) for i in range(1, num_tellers + 1)]
+    tellers = [Teller(i, customer_queue, data_lock, timing_data, customer_count) for i in range(1, num_tellers + 1)]
 
     customer_id = 1
     try:
@@ -72,9 +75,9 @@ def main():
             teller.join()
 
         # Write the data to a CSV file
-        write_to_csv(timing_data)
+        write_to_csv(timing_data, customer_count)
 
-def write_to_csv(timing_data):
+def write_to_csv(timing_data, customer_count):
     total_turnaround_time = 0
     total_waiting_time = 0
     total_response_time = 0
@@ -94,8 +97,8 @@ def write_to_csv(timing_data):
     print(f"Average Waiting Time: {avg_waiting_time:.2f} seconds")
     print(f"Average Response Time: {avg_response_time:.2f} seconds")
 
-    generate_graph(avg_turnaround_time, avg_waiting_time, avg_response_time)
-
+    for teller_id, count in customer_count.items():
+        print(f"Teller {teller_id} attended {count} customers")
 
     generate_graph(avg_turnaround_time, avg_waiting_time, avg_response_time)
 
@@ -104,11 +107,13 @@ def generate_graph(avg_turnaround_time, avg_waiting_time, avg_response_time):
     values = [avg_turnaround_time, avg_waiting_time, avg_response_time]
 
     plt.figure(figsize=(8, 6))
-    plt.bar(labels, values, color=['blue', 'orange', 'green'])
+    plt.plot(labels, values, marker='o', linestyle='-')
     plt.xlabel('Metrics')
     plt.ylabel('Time (seconds)')
     plt.title('Average Turnaround Time, Waiting Time, and Response Time')
+    plt.grid(True)  # Add grid lines
     plt.show()
+
 
 if __name__ == "__main__":
     main()

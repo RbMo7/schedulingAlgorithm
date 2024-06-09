@@ -22,13 +22,13 @@ remaining_service_times = {}
 turnaround_times = []
 waiting_times = []
 response_times = []
+customers_served_by_teller = {i: 0 for i in range(1, NUM_TELLERS + 1)}
 
 # Lock for safe updates to statistics
 stats_lock = threading.Lock()
 
 # Event to stop threads
 stop_simulation = threading.Event()
-
 
 def clear_queue(q):
     while not q.empty():
@@ -58,6 +58,7 @@ def teller_round_robin_service(teller_id):
                 if customer_id not in first_service_start_times:
                     first_service_start_times[customer_id] = start_timestamp
                     response_times.append(start_timestamp - arrival_times[customer_id])
+                customers_served_by_teller[teller_id] += 1  # Increment the counter for this teller
             print(f"Customer {customer_id} is at Teller {teller_id} for {TIME_QUANTUM} seconds")
             if service_duration <= TIME_QUANTUM:
                 time.sleep(service_duration)
@@ -118,19 +119,23 @@ def compute_statistics(description):
     print(f"Average Turnaround Time: {avg_turnaround_time:.4f} seconds")
     print(f"Average Waiting Time: {avg_waiting_time:.4f} seconds")
     print(f"Average Response Time: {avg_response_time:.4f} seconds")
-    plot_statistics(avg_turnaround_time, avg_waiting_time, avg_response_time)
+    for teller_id, count in customers_served_by_teller.items():
+        print(f"Teller {teller_id} attended {count} customers")
+    generate_graph(avg_turnaround_time, avg_waiting_time, avg_response_time)
 
 # Function to plot statistics
-def plot_statistics(turnaround_time, waiting_time, response_time):
+def generate_graph(avg_turnaround_time, avg_waiting_time, avg_response_time):
     labels = ['Turnaround Time', 'Waiting Time', 'Response Time']
-    values = [turnaround_time, waiting_time, response_time]
+    values = [avg_turnaround_time, avg_waiting_time, avg_response_time]
 
     plt.figure(figsize=(8, 6))
-    plt.bar(labels, values, color=['blue', 'orange', 'green'])
+    plt.plot(labels, values, marker='o', linestyle='-')
     plt.xlabel('Metrics')
     plt.ylabel('Time (seconds)')
-    plt.title('Average Times for Turnaround, Waiting, and Response')
+    plt.title('Average Turnaround Time, Waiting Time, and Response Time')
+    plt.grid(True)  # Add grid lines
     plt.show()
+
 
 # Execute the simulation
 if __name__ == "__main__":
