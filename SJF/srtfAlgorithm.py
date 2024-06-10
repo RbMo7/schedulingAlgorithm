@@ -2,8 +2,6 @@ import threading
 import queue
 import random
 import time
-import os
-import csv
 import matplotlib.pyplot as plt
 
 class Customer:
@@ -85,18 +83,14 @@ def calculate_averages(completed_customers):
     total_response_time = 0
     num_customers = len(completed_customers)
 
-    with open("./SJF/sjfData.csv", "a", newline="") as file:
-        writer = csv.writer(file)
-        for customer in completed_customers:
-            turnaround_time = customer.end_time - customer.arrival_time
-            waiting_time = customer.start_time - customer.arrival_time
-            response_time = customer.start_time - customer.arrival_time
-            
-            total_turnaround_time += turnaround_time
-            total_waiting_time += waiting_time
-            total_response_time += response_time
-
-            writer.writerow([customer.id, customer.service_time, customer.arrival_time, customer.start_time, customer.end_time])
+    for customer in completed_customers:
+        turnaround_time = customer.end_time - customer.arrival_time
+        waiting_time = customer.start_time - customer.arrival_time
+        response_time = customer.start_time - customer.arrival_time
+        
+        total_turnaround_time += turnaround_time
+        total_waiting_time += waiting_time
+        total_response_time += response_time
 
     avg_turnaround_time = total_turnaround_time / num_customers
     avg_waiting_time = total_waiting_time / num_customers
